@@ -11,8 +11,7 @@ seaborn>=0.13
 tqdm>=4.66
 PyYAML>=6.0
 
-# Dataset access & Deep Learning utilities
-kagglehub>=0.2.0
+# Deep Learning utilities
 timm>=1.0
 
 # Note on PyTorch:

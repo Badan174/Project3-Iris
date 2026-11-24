@@ -19,6 +19,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.data import (  # noqa: E402
+    build_dataset_summary,
     create_closed_set_splits,
     create_open_set_splits,
     generate_verification_pairs,
@@ -208,6 +209,25 @@ class TestDatasetUtils(unittest.TestCase):
         report = verify_no_leakage(closed_df, open_df, val_pairs_1, test_pairs)
         self.assertTrue(report["passed"])
 
+        summary = build_dataset_summary(
+            df,
+            closed_df,
+            open_df,
+            val_pairs_1,
+            test_pairs,
+            report,
+            {"dataset_name": "Test", "seed": 42},
+        )
+        for key in (
+            "resolution_distribution",
+            "quality_stats",
+            "closed_set",
+            "open_set",
+            "verification_pairs",
+            "leakage_check",
+        ):
+            self.assertIn(key, summary)
+
         # Deliberately inject leakage from val into test_pairs and verify check fails
         leaked_test = test_pairs.copy()
         leaked_test.iloc[0, leaked_test.columns.get_loc("img1_path")] = val_pairs_1.iloc[0][
@@ -274,6 +294,14 @@ class TestDatasetUtils(unittest.TestCase):
             summary = json.load(f)
         self.assertEqual(summary["valid_images"], 400)
         self.assertTrue(summary["leakage_check"]["passed"])
+        for key in (
+            "resolution_distribution",
+            "quality_stats",
+            "closed_set",
+            "open_set",
+            "verification_pairs",
+        ):
+            self.assertIn(key, summary)
 
 
 if __name__ == "__main__":

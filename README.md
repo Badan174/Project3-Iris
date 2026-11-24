@@ -1,84 +1,87 @@
-# Nhận diện Mống mắt (Iris Recognition): Truyền thống vs Deep Learning
+# Nhận diện Mống mắt (Iris Recognition): Phương pháp Truyền thống và Học sâu
 
-Dự án nghiên cứu và so sánh phương pháp **Truyền thống** (Log-Gabor IrisCode + Hamming Distance, LBP/HOG + SVM) và **Deep Learning** (CNN Classification, ArcFace Metric Learning) trên bộ dữ liệu **CASIA-Iris-Thousand** cho cả hai bài toán:
-- **Identification (`1:N` — Closed-set)**: Nhận diện danh tính từ ảnh mống mắt.
-- **Verification (`1:1` — Open-set)**: Xác thực 2 ảnh có thuộc cùng một mắt hay không (trên nhóm người hoàn toàn mới chưa xuất hiện khi train).
+## 1. Tổng quan dự án
+
+Dự án nghiên cứu, triển khai và so sánh hiệu năng giữa **phương pháp truyền thống** và **học sâu (Deep Learning)** cho bài toán nhận diện sinh trắc học mống mắt trên bộ dữ liệu **CASIA-Iris-Thousand**. Hệ thống giải quyết đồng thời hai bài toán chuẩn trong sinh trắc học:
+- **Nhận dạng (`1:N` — Closed-set Identification):** Phân loại ảnh mống mắt vào đúng lớp danh tính đã đăng ký.
+- **Xác thực (`1:1` — Open-set Verification):** Đối chiếu cặp hai ảnh mống mắt để kết luận cùng một mắt (*Genuine*) hay khác mắt (*Impostor*) trên tập đối tượng hoàn toàn mới chưa xuất hiện trong quá trình huấn luyện.
 
 ---
 
-## Cấu trúc thư mục dự án
+## 2. Bộ dữ liệu và Thiết kế thực nghiệm
+
+### Thông số bộ dữ liệu (CASIA-Iris-Thousand)
+- **Quy mô:** 1.000 đối tượng, mỗi đối tượng có ảnh mắt trái (`L`) và mắt phải (`R`) được xem là 2 lớp độc lập về mặt sinh học, tạo thành **2.000 lớp mắt** với **20.000 ảnh** (10 ảnh/mắt).
+- **Đặc tính ảnh:** Ảnh thang xám chụp dưới ánh sáng hồng ngoại gần (NIR), độ phân giải `640 × 480`, thu thập bằng thiết bị IKEMB-100 dual-eye iris camera.
+- **Thách thức nhiễu thực tế:** Đeo kính mắt, đốm phản xạ ánh sáng (specular reflection), che khuất do mí mắt/lông mi và ảnh mất nét.
+
+### Giao thức chia tập (dùng chung cho mọi mô hình)
+Để đảm bảo đánh giá công bằng và tái lập kết quả, dự án sinh một bộ chia cố định kèm kiểm tra tự động chống rò rỉ dữ liệu (`verify_no_leakage`):
+- **Kịch bản Closed-set (`1:N`):** Phân tầng theo từng lớp mắt theo tỷ lệ `6 Train / 2 Val / 2 Test`; đồng thời gắn cờ tập con `in_subset_200_eyes` (100 đối tượng đầu, 200 lớp mắt) phục vụ đối chiếu với các mô hình ML truyền thống có chi phí tính toán cao (như RBF SVM).
+- **Kịch bản Open-set (`1:1`):** Tách biệt hoàn toàn theo đối tượng (`700 Train / 150 Val / 150 Test`). Từ các tập `Val` và `Test` sinh cố định tệp cặp đối sánh `val_pairs.csv` và `test_pairs.csv` (mỗi tập gồm 3.000 cặp *Genuine* và 3.000 cặp *Impostor*, trong đó **25%** cặp mạo danh là **mắt trái và mắt phải của cùng một đối tượng** nhằm kiểm tra tính chặt chẽ của mô hình).
+
+---
+
+## 3. Phương pháp và Chỉ số đánh giá
+
+- **Tiền xử lý:** Định vị đồng tử và vòng mống mắt, tạo mặt nạ nhiễu (noise mask), chuẩn hóa vùng vành khăn theo mô hình **Daugman Rubber Sheet**, tăng cường tương phản **CLAHE** và trích xuất vùng ảnh ROI.
+- **Phương pháp truyền thống:**
+  - Pipeline sinh trắc học cổ điển: Bộ lọc **1D Log-Gabor** tạo mã nhị phân **IrisCode** và đối sánh bằng **Hamming Distance** có dịch vòng.
+  - Đặc trưng thủ công (**LBP**, **HOG**) kết hợp giảm chiều **PCA** và bộ phân loại học máy (**SVM**, **k-NN**).
+- **Phương pháp Deep Learning:**
+  - Học chuyển giao phân loại (`1:N`) với các mạng gọn nhẹ (**ResNet**, **MobileNetV3**, **EfficientNet**).
+  - Học biểu diễn sâu (`1:1` Open-set & `1:N`) với **ArcFace Loss** và đối sánh **Cosine Similarity**.
+- **Chỉ số đánh giá:**
+  - Bài toán `1:N`: Rank-1 Accuracy, Rank-5 Accuracy, Macro F1-score, Confusion Matrix.
+  - Bài toán `1:1`: **EER** (Equal Error Rate), **FAR**, **FRR**, **ROC-AUC**, **TAR @ FAR = 0.1% / 1%**, phân bố điểm *Genuine* vs *Impostor*.
+
+---
+
+## 4. Cấu trúc thư mục
 
 ```text
-c:/prj3/
+.
 ├── configs/
-│   └── dataset_config.yaml      # Cấu hình tham số chia tập & chất lượng ảnh
+│   └── dataset_config.yaml      # Cấu hình tham số chia tập và ngưỡng chất lượng ảnh
 ├── data/
-│   ├── raw/                     # Dữ liệu gốc (không commit lên Git)
-│   ├── processed/               # Ảnh Rubber Sheet / ROI sau tiền xử lý (không commit)
-│   └── splits/                  # Bộ chia CSV cố định dùng chung (được theo dõi trên Git)
+│   ├── raw/                     # Lưu trữ dữ liệu ảnh gốc (không theo dõi trên Git)
+│   ├── processed/               # Dữ liệu sau tiền xử lý Rubber Sheet / ROI (không theo dõi trên Git)
+│   └── splits/                  # Các tệp CSV phân chia tập và dataset_summary.json dùng chung
 ├── notebooks/
-│   └── 01_eda_and_splits.ipynb  # Notebook Colab: Tải data, EDA, sinh file splits
-├── results/                     # Biểu đồ EDA, trọng số model, bảng đánh giá
+│   └── 01_eda_and_splits.ipynb  # Khảo sát EDA, trực quan hóa chất lượng ảnh và sinh bộ chia tập
+├── results/                     # Biểu đồ phân tích, trọng số mô hình và bảng kết quả
 ├── scripts/
-│   └── prepare_splits.py        # Script CLI sinh file splits từ dòng lệnh
+│   └── prepare_splits.py        # Script CLI quét dữ liệu, kiểm tra hợp lệ và tạo bộ chia tập
 ├── src/
-│   ├── data/                    # Quét dataset, kiểm tra chất lượng, chia tập & check leakage
-│   ├── preprocessing/           # Phân đoạn & chuẩn hóa Rubber Sheet (Giai đoạn 2)
-│   ├── traditional/             # Log-Gabor IrisCode, LBP/HOG + ML (Giai đoạn 3)
-│   ├── deep_learning/           # CNN & ArcFace Metric Learning (Giai đoạn 4)
-│   └── evaluation/              # Chỉ số Rank-k, EER, FAR/FRR, ROC/DET (Giai đoạn 5)
+│   ├── data/                    # Module quét dữ liệu, đo chỉ số chất lượng, chia tập & kiểm tra leakage
+│   ├── preprocessing/           # Phân đoạn mống mắt và chuẩn hóa Rubber Sheet
+│   ├── traditional/             # Log-Gabor IrisCode, đặc trưng thủ công và bộ phân loại ML
+│   ├── deep_learning/           # Pipeline PyTorch, CNN Classification và ArcFace Metric Learning
+│   └── evaluation/              # Tính toán các chỉ số sinh trắc học và vẽ đường cong ROC/DET
 ├── tests/
-│   └── test_dataset_utils.py    # Unit test cho pipeline xử lý & chia tập dữ liệu
+│   └── test_dataset_utils.py    # Bộ kiểm thử đơn vị cho module xử lý và chia tập dữ liệu
 ├── .gitignore
 └── requirements.txt
 ```
 
 ---
 
-## Hướng dẫn tự thực hiện (Bước 1: Repo, Dữ liệu & EDA)
+## 5. Cài đặt và Thực thi
 
-### 1. Tạo Git repository và đẩy lên GitHub
-Tại thư mục `c:\prj3`, chạy lần lượt:
-```powershell
-git init
-git add .
-git commit -m "Scaffold step 1: dataset utils, split generator, and Colab EDA notebook"
-```
-Sau đó tạo một repository trống trên GitHub (không tích chọn README hay `.gitignore` vì local đã có sẵn), rồi liên kết và đẩy lên:
-```powershell
-git branch -M main
-git remote add origin https://github.com/<USERNAME>/<TEN_REPO>.git
-git push -u origin main
-```
-> **Lưu ý:** File `.gitignore` đã được cấu hình để **chặn không đẩy** ảnh dữ liệu nặng (`data/raw/`), file nén (`*.zip`), trọng số mô hình (`*.pth`) và khóa bí mật (`kaggle.json`), nhưng **vẫn giữ lại** các file chia tập cố định trong `data/splits/*.csv`.
-
----
-
-### 2. Tự tải dữ liệu CASIA-Iris-Thousand từ Kaggle
-Truy cập Kaggle và tìm từ khóa `"CASIA-Iris-Thousand"` (bộ gồm 20.000 ảnh từ 1.000 người, dung lượng ~515 MB). Bạn có 2 lựa chọn:
-- **Cách A (Khuyên dùng — Tải thủ công lên Google Drive):**
-  1. Tải file `.zip` từ trang dataset Kaggle về máy tính.
-  2. Upload file `.zip` đó lên Google Drive vào thư mục `MyDrive/prj3/CASIA-Iris-Thousand.zip`.
-  3. Trong `notebooks/01_eda_and_splits.ipynb`, đặt `DOWNLOAD_MODE = "drive_zip"`.
-- **Cách B (Dùng Kaggle API trực tiếp trên Colab):**
-  1. Vào Kaggle -> **Account / Settings** -> **API** -> **Create New Token** để tải file `kaggle.json` (tuyệt đối giữ bí mật, không commit lên GitHub).
-  2. Upload `kaggle.json` lên Colab (`/root/.config/kaggle/kaggle.json`) hoặc đặt `KAGGLE_USERNAME` / `KAGGLE_KEY` và giữ `DOWNLOAD_MODE = "kagglehub"`.
-
----
-
-### 3. (Tùy chọn) Tạo môi trường ảo `.venv` trên Windows để chạy kiểm thử cục bộ
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+### Cài đặt phụ thuộc
+```bash
 pip install -r requirements.txt
+```
+*(PyTorch được mặc định sử dụng bản cài đặt sẵn có hỗ trợ CUDA trên Google Colab; khi chạy cục bộ có thể cài bổ sung `torch` và `torchvision` phù hợp với cấu hình phần cứng.)*
+
+### Chuẩn bị dữ liệu và sinh bộ chia tập
+- **Trên Google Colab:** Đặt tệp nén `CASIA-Iris-Thousand.zip` tại `MyDrive/prj3/CASIA-Iris-Thousand.zip` trên Google Drive, sau đó chạy toàn bộ [notebooks/01_eda_and_splits.ipynb](notebooks/01_eda_and_splits.ipynb). Notebook sẽ giải nén vào ổ cục bộ (`/content/data`), tạo biểu đồ EDA tại `results/eda/` và xuất các tệp phân chia tại `data/splits/`.
+- **Qua dòng lệnh (CLI):** Giải nén bộ dữ liệu và thực thi:
+  ```bash
+  python scripts/prepare_splits.py --raw-dir <path_to_CASIA-Iris-Thousand>
+  ```
+
+### Kiểm thử đơn vị
+```bash
 python -m unittest discover -s tests -v
 ```
-
----
-
-### 4. Chạy Notebook 01 trên Google Colab (Runtime CPU)
-1. Mở [Google Colab](https://colab.research.google.com/), chọn tab **GitHub**, dán link repo của bạn và mở `notebooks/01_eda_and_splits.ipynb`.
-2. Chọn **Runtime -> Change runtime type -> CPU** (bước EDA không cần GPU).
-3. Cập nhật biến `REPO_URL` thành link GitHub repo của bạn ở cell đầu tiên rồi chạy toàn bộ notebook (**Runtime -> Run all**).
-4. Kiểm tra các biểu đồ lưu tại `results/eda/` (trên Drive: `MyDrive/prj3/eda/`) và các file chia tập tại `data/splits/` (trên Drive: `MyDrive/prj3/splits/`).
-5. Tải các file trong `MyDrive/prj3/splits/` về đặt vào `c:\prj3\data\splits\` và commit lên GitHub để đồng bộ cho Giai đoạn 2 (Tiền xử lý & Daugman Rubber Sheet).

@@ -596,3 +596,86 @@ def verify_no_leakage(
         "val_pairs_count": len(val_pairs),
         "test_pairs_count": len(test_pairs),
     }
+
+
+def _series_summary(series: pd.Series) -> dict[str, float]:
+    """Compute descriptive summary stats for a numeric Series."""
+    clean = series.dropna()
+    if clean.empty:
+        return {}
+    return {
+        "mean": round(float(clean.mean()), 6),
+        "std": round(float(clean.std()), 6),
+        "min": round(float(clean.min()), 6),
+        "p25": round(float(clean.quantile(0.25)), 6),
+        "median": round(float(clean.median()), 6),
+        "p75": round(float(clean.quantile(0.75)), 6),
+        "max": round(float(clean.max()), 6),
+    }
+
+
+def build_dataset_summary(
+    meta_df: pd.DataFrame,
+    closed_df: pd.DataFrame,
+    open_df: pd.DataFrame,
+    val_pairs: pd.DataFrame,
+    test_pairs: pd.DataFrame,
+    leakage_report: dict[str, object],
+    config: dict[str, object],
+) -> dict[str, object]:
+    """Build a JSON-serializable summary of dataset quality and splits."""
+    valid_df = _filter_valid(meta_df)
+    res_counts = (
+        valid_df.assign(
+            resolution=valid_df["width"].astype(str) + "x" + valid_df["height"].astype(str)
+        )["resolution"]
+        .value_counts()
+        .to_dict()
+    )
+    eye_counts = valid_df.groupby("eye_id").size()
+
+    quality_stats: dict[str, dict[str, float]] = {}
+    for col in ("mean_intensity", "std_intensity", "specular_ratio", "laplacian_var"):
+        if col in valid_df.columns:
+            quality_stats[col] = _series_summary(valid_df[col])
+
+    return {
+        "dataset_name": config.get("dataset_name", "CASIA-Iris-Thousand"),
+        "seed": int(config.get("seed", 42)),
+        "total_images_scanned": int(len(meta_df)),
+        "valid_images": int(len(valid_df)),
+        "invalid_images": int(len(meta_df) - len(valid_df)),
+        "num_subjects": int(valid_df["subject_id"].nunique()),
+        "num_eyes": int(valid_df["eye_id"].nunique()),
+        "images_per_eye_min": int(eye_counts.min()) if not eye_counts.empty else 0,
+        "images_per_eye_max": int(eye_counts.max()) if not eye_counts.empty else 0,
+        "resolution_distribution": {str(k): int(v) for k, v in res_counts.items()},
+        "quality_stats": quality_stats,
+        "closed_set": {
+            "split_counts": {
+                str(k): int(v) for k, v in closed_df["split"].value_counts().to_dict().items()
+            },
+            "subset_200_eyes_images": int(closed_df["in_subset_200_eyes"].sum()),
+            "subset_200_eyes_classes": int(
+                closed_df.loc[closed_df["in_subset_200_eyes"], "eye_id"].nunique()
+            ),
+        },
+        "open_set": {
+            "image_counts": {
+                str(k): int(v) for k, v in open_df["split"].value_counts().to_dict().items()
+            },
+            "subject_counts": {
+                str(k): int(v)
+                for k, v in open_df.groupby("split")["subject_id"].nunique().to_dict().items()
+            },
+        },
+        "verification_pairs": {
+            "val_pair_types": {
+                str(k): int(v) for k, v in val_pairs["pair_type"].value_counts().to_dict().items()
+            },
+            "test_pair_types": {
+                str(k): int(v) for k, v in test_pairs["pair_type"].value_counts().to_dict().items()
+            },
+        },
+        "leakage_check": leakage_report,
+    }

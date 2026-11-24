@@ -29,7 +29,6 @@ results/checkpoints/
 results/models/
 
 # Secrets & credentials
-kaggle.json
 .env
 .env.*
 *.key

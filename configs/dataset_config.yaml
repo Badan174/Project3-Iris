@@ -1,5 +1,4 @@
 dataset_name: "CASIA-Iris-Thousand"
-kaggle_slug: "sondosaabed/casia-iris-thousand"
 seed: 42
 
 image_extensions:
