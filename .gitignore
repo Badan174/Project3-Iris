@@ -1,0 +1,56 @@
+# Raw and processed datasets (never commit large binary images to Git)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# Keep deterministic split files tracked so local and Colab match
+!data/splits/*.csv
+!data/splits/*.json
+!data/splits/.gitkeep
+
+# Archives
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
+
+# Model weights, checkpoints, and serialized artifacts
+*.pth
+*.pt
+*.ckpt
+*.onnx
+*.pkl
+*.joblib
+*.h5
+results/checkpoints/
+results/models/
+
+# Secrets & credentials
+kaggle.json
+.env
+.env.*
+*.key
+*.pem
+
+# Python & Jupyter artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# OS & editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

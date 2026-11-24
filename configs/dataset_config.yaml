@@ -1,0 +1,32 @@
+dataset_name: "CASIA-Iris-Thousand"
+kaggle_slug: "sondosaabed/casia-iris-thousand"
+seed: 42
+
+image_extensions:
+  - ".jpg"
+  - ".jpeg"
+  - ".bmp"
+  - ".png"
+
+closed_set:
+  train_per_eye: 6
+  val_per_eye: 2
+  test_per_eye: 2
+  # First 100 subjects -> 200 eye classes (2,000 images) for fast debugging and RBF SVM comparisons
+  subset_num_subjects: 100
+
+open_set:
+  train_subjects: 700
+  val_subjects: 150
+  test_subjects: 150
+
+verification_pairs:
+  val_num_genuine: 3000
+  val_num_impostor: 3000
+  test_num_genuine: 3000
+  test_num_impostor: 3000
+  # Fraction of impostor pairs sampled from L vs R eyes of the SAME subject (hard negative pairs)
+  same_subject_impostor_ratio: 0.25
+
+quality_thresholds:
+  specular_pixel_threshold: 245
