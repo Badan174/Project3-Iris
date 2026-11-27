@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
+import os
 import zipfile
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
@@ -188,15 +190,31 @@ def preprocess_dataset(
 
     results: list[dict[str, Any]] = []
     if num_workers > 1 and len(tasks) > 1:
-        with ProcessPoolExecutor(
-            max_workers=int(num_workers),
-            initializer=_init_worker,
-        ) as executor:
-            iterator = executor.map(_process_record_worker, tasks, chunksize=32)
-            if show_progress:
-                iterator = tqdm(iterator, total=len(tasks), desc="Preprocessing images")
-            for item in iterator:
-                results.append(item)
+        repo_root = str(Path(__file__).resolve().parents[2])
+        prev_pythonpath = os.environ.get("PYTHONPATH")
+        paths = prev_pythonpath.split(os.pathsep) if prev_pythonpath else []
+        if repo_root not in paths:
+            os.environ["PYTHONPATH"] = (
+                f"{repo_root}{os.pathsep}{prev_pythonpath}" if prev_pythonpath else repo_root
+            )
+        try:
+            # Use 'spawn' so workers do not inherit locked OpenCV C++ mutexes after fork() on Linux
+            mp_ctx = multiprocessing.get_context("spawn")
+            with ProcessPoolExecutor(
+                max_workers=int(num_workers),
+                mp_context=mp_ctx,
+                initializer=_init_worker,
+            ) as executor:
+                iterator = executor.map(_process_record_worker, tasks, chunksize=16)
+                if show_progress:
+                    iterator = tqdm(iterator, total=len(tasks), desc="Preprocessing images")
+                for item in iterator:
+                    results.append(item)
+        finally:
+            if prev_pythonpath is None:
+                os.environ.pop("PYTHONPATH", None)
+            else:
+                os.environ["PYTHONPATH"] = prev_pythonpath
     else:
         iterator = tasks
         if show_progress:

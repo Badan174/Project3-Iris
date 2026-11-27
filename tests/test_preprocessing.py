@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -189,13 +190,18 @@ class TestIrisPreprocessing(unittest.TestCase):
 
             pd.DataFrame(rows).to_csv(meta_csv, index=False)
 
-            returned_df = preprocess_dataset(
-                metadata_csv=meta_csv,
-                raw_dir=raw_dir,
-                output_dir=out_dir,
-                num_workers=2,
-                show_progress=False,
-            )
+            prev_cwd = os.getcwd()
+            os.chdir(tmp)
+            try:
+                returned_df = preprocess_dataset(
+                    metadata_csv=meta_csv,
+                    raw_dir=raw_dir,
+                    output_dir=out_dir,
+                    num_workers=2,
+                    show_progress=False,
+                )
+            finally:
+                os.chdir(prev_cwd)
             self.assertEqual(len(returned_df), 4)
             archive_processed_dir(out_dir, zip_path)
 
