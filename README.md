@@ -42,24 +42,25 @@ Dự án nghiên cứu, triển khai và so sánh hiệu năng giữa **phương
 ```text
 .
 ├── configs/
-│   └── dataset_config.yaml      # Cấu hình tham số chia tập và ngưỡng chất lượng ảnh
+│   ├── dataset_config.yaml         # Cấu hình tham số chia tập và ngưỡng chất lượng ảnh
+│   └── preprocessing_config.yaml   # Cấu hình phân đoạn, Rubber Sheet và cắt ROI
 ├── data/
-│   ├── raw/                     # Lưu trữ dữ liệu ảnh gốc (không theo dõi trên Git)
-│   ├── processed/               # Dữ liệu sau tiền xử lý Rubber Sheet / ROI (không theo dõi trên Git)
-│   └── splits/                  # Các tệp CSV phân chia tập và dataset_summary.json dùng chung
+│   ├── raw/                        # Lưu trữ dữ liệu ảnh gốc (không theo dõi trên Git)
+│   ├── processed/                  # Dữ liệu sau tiền xử lý Rubber Sheet / ROI (không theo dõi trên Git)
+│   └── splits/                     # Các tệp CSV phân chia tập và dataset_summary.json dùng chung
 ├── notebooks/
-│   └── 01_eda_and_splits.ipynb  # Khảo sát EDA, trực quan hóa chất lượng ảnh và sinh bộ chia tập
-├── results/                     # Biểu đồ phân tích, trọng số mô hình và bảng kết quả
-├── scripts/
-│   └── prepare_splits.py        # Script CLI quét dữ liệu, kiểm tra hợp lệ và tạo bộ chia tập
+│   ├── 01_eda_and_splits.ipynb     # Khảo sát EDA, trực quan hóa chất lượng ảnh và sinh bộ chia tập
+│   └── 02_preprocessing.ipynb      # Định vị, chuẩn hóa Rubber Sheet, cắt ROI và đóng gói dữ liệu
+├── results/                        # Biểu đồ phân tích, trọng số mô hình và bảng kết quả
 ├── src/
-│   ├── data/                    # Module quét dữ liệu, đo chỉ số chất lượng, chia tập & kiểm tra leakage
-│   ├── preprocessing/           # Phân đoạn mống mắt và chuẩn hóa Rubber Sheet
-│   ├── traditional/             # Log-Gabor IrisCode, đặc trưng thủ công và bộ phân loại ML
-│   ├── deep_learning/           # Pipeline PyTorch, CNN Classification và ArcFace Metric Learning
-│   └── evaluation/              # Tính toán các chỉ số sinh trắc học và vẽ đường cong ROC/DET
+│   ├── data/                       # Module quét dữ liệu, đo chỉ số chất lượng, chia tập & kiểm tra leakage
+│   ├── preprocessing/              # Phân đoạn mống mắt, chuẩn hóa Rubber Sheet và cắt ROI
+│   ├── traditional/                # Log-Gabor IrisCode, đặc trưng thủ công và bộ phân loại ML
+│   ├── deep_learning/              # Pipeline PyTorch, CNN Classification và ArcFace Metric Learning
+│   └── evaluation/                 # Tính toán các chỉ số sinh trắc học và vẽ đường cong ROC/DET
 ├── tests/
-│   └── test_dataset_utils.py    # Bộ kiểm thử đơn vị cho module xử lý và chia tập dữ liệu
+│   ├── test_dataset_utils.py       # Bộ kiểm thử đơn vị cho module xử lý và chia tập dữ liệu
+│   └── test_preprocessing.py       # Bộ kiểm thử đơn vị cho module tiền xử lý mống mắt
 ├── .gitignore
 └── requirements.txt
 ```
@@ -74,12 +75,11 @@ pip install -r requirements.txt
 ```
 *(PyTorch được mặc định sử dụng bản cài đặt sẵn có hỗ trợ CUDA trên Google Colab; khi chạy cục bộ có thể cài bổ sung `torch` và `torchvision` phù hợp với cấu hình phần cứng.)*
 
-### Chuẩn bị dữ liệu và sinh bộ chia tập
+### Giai đoạn 1: Chuẩn bị dữ liệu và sinh bộ chia tập
 - **Trên Google Colab:** Đặt tệp nén `CASIA-Iris-Thousand.zip` tại `MyDrive/prj3/CASIA-Iris-Thousand.zip` trên Google Drive, sau đó chạy toàn bộ [notebooks/01_eda_and_splits.ipynb](notebooks/01_eda_and_splits.ipynb). Notebook sẽ giải nén vào ổ cục bộ (`/content/data`), tạo biểu đồ EDA tại `results/eda/` và xuất các tệp phân chia tại `data/splits/`.
-- **Qua dòng lệnh (CLI):** Giải nén bộ dữ liệu và thực thi:
-  ```bash
-  python scripts/prepare_splits.py --raw-dir <path_to_CASIA-Iris-Thousand>
-  ```
+
+### Giai đoạn 2: Tiền xử lý và chuẩn hóa ảnh mống mắt
+- **Trên Google Colab:** Chạy [notebooks/02_preprocessing.ipynb](notebooks/02_preprocessing.ipynb) để định vị đồng tử/mống mắt, chuẩn hóa Daugman Rubber Sheet (`64 × 256` kèm CLAHE và `valid_mask`), trích xuất ROI (`224 × 224`) và lưu tệp nén `processed_casia_thousand.zip` lên Google Drive.
 
 ### Kiểm thử đơn vị
 ```bash

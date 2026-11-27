@@ -1,0 +1,106 @@
+{
+  "dataset_name": "CASIA-Iris-Thousand",
+  "seed": 42,
+  "total_images_scanned": 20000,
+  "valid_images": 20000,
+  "invalid_images": 0,
+  "num_subjects": 1000,
+  "num_eyes": 2000,
+  "images_per_eye_min": 10,
+  "images_per_eye_max": 10,
+  "resolution_distribution": {
+    "640x480": 20000
+  },
+  "quality_stats": {
+    "mean_intensity": {
+      "mean": 89.344548,
+      "std": 4.36823,
+      "min": 62.903561,
+      "p25": 86.850372,
+      "median": 89.573162,
+      "p75": 91.964815,
+      "max": 212.813339
+    },
+    "std_intensity": {
+      "mean": 32.516151,
+      "std": 4.949784,
+      "min": 19.865927,
+      "p25": 29.065434,
+      "median": 31.690773,
+      "p75": 35.251369,
+      "max": 59.425011
+    },
+    "specular_ratio": {
+      "mean": 7.6e-05,
+      "std": 6.4e-05,
+      "min": 3e-06,
+      "p25": 4.2e-05,
+      "median": 5.5e-05,
+      "p75": 7.8e-05,
+      "max": 0.000866
+    },
+    "laplacian_var": {
+      "mean": 104.040242,
+      "std": 76.85338,
+      "min": 24.450706,
+      "p25": 58.958178,
+      "median": 78.438404,
+      "p75": 119.174847,
+      "max": 1167.02478
+    }
+  },
+  "closed_set": {
+    "split_counts": {
+      "train": 12000,
+      "test": 4000,
+      "val": 4000
+    },
+    "subset_200_eyes_images": 2000,
+    "subset_200_eyes_classes": 200
+  },
+  "open_set": {
+    "image_counts": {
+      "train": 14000,
+      "test": 3000,
+      "val": 3000
+    },
+    "subject_counts": {
+      "test": 150,
+      "train": 700,
+      "val": 150
+    }
+  },
+  "verification_pairs": {
+    "val_pair_types": {
+      "genuine": 3000,
+      "impostor_diff_subject": 2250,
+      "impostor_same_subject": 750
+    },
+    "test_pair_types": {
+      "genuine": 3000,
+      "impostor_diff_subject": 2250,
+      "impostor_same_subject": 750
+    }
+  },
+  "leakage_check": {
+    "passed": true,
+    "closed_set_counts": {
+      "train": 12000,
+      "val": 4000,
+      "test": 4000
+    },
+    "closed_set_num_eyes": 2000,
+    "open_set_image_counts": {
+      "train": 14000,
+      "val": 3000,
+      "test": 3000
+    },
+    "open_set_subject_counts": {
+      "train": 700,
+      "val": 150,
+      "test": 150
+    },
+    "val_pairs_count": 6000,
+    "test_pairs_count": 6000
+  }
+}

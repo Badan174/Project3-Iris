@@ -1,9 +1,8 @@
-"""Unit tests for CASIA-Iris-Thousand scanning, validation, splitting, and CLI."""
+"""Unit tests for CASIA-Iris-Thousand scanning, validation, splitting, and summary pipeline."""
 
 from __future__ import annotations
 
 import json
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -11,7 +10,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import yaml
 from PIL import Image
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -78,7 +76,7 @@ def _create_synthetic_casia_tree(
 
 
 class TestDatasetUtils(unittest.TestCase):
-    """Test suite for src.data.dataset_utils and scripts/prepare_splits.py."""
+    """Test suite for src.data.dataset_utils."""
 
     def setUp(self) -> None:
         self.tmp_dir = tempfile.TemporaryDirectory()
@@ -236,48 +234,53 @@ class TestDatasetUtils(unittest.TestCase):
         with self.assertRaises(AssertionError):
             verify_no_leakage(closed_df, open_df, val_pairs_1, leaked_test)
 
-    def test_prepare_splits_cli_end_to_end(self) -> None:
-        cfg_path = self.root / "test_config.yaml"
+    def test_full_split_pipeline_end_to_end(self) -> None:
         out_dir = self.root / "splits_out"
-        test_cfg = {
-            "dataset_name": "CASIA-Iris-Thousand-Synthetic",
-            "seed": 42,
-            "image_extensions": [".jpg"],
-            "closed_set": {
-                "train_per_eye": 6,
-                "val_per_eye": 2,
-                "test_per_eye": 2,
-                "subset_num_subjects": 5,
-            },
-            "open_set": {
-                "train_subjects": 14,
-                "val_subjects": 3,
-                "test_subjects": 3,
-            },
-            "verification_pairs": {
-                "val_num_genuine": 40,
-                "val_num_impostor": 40,
-                "test_num_genuine": 40,
-                "test_num_impostor": 40,
-                "same_subject_impostor_ratio": 0.25,
-            },
-            "quality_thresholds": {"specular_pixel_threshold": 245},
-        }
-        with open(cfg_path, "w", encoding="utf-8") as f:
-            yaml.safe_dump(test_cfg, f)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        cfg = {"dataset_name": "CASIA-Iris-Thousand-Synthetic", "seed": 42}
 
-        cmd = [
-            sys.executable,
-            str(REPO_ROOT / "scripts" / "prepare_splits.py"),
-            "--raw-dir",
-            str(self.raw_dir),
-            "--config",
-            str(cfg_path),
-            "--output-dir",
-            str(out_dir),
-        ]
-        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
-        self.assertEqual(proc.returncode, 0, msg=f"CLI failed:\n{proc.stdout}\n{proc.stderr}")
+        scanned_df = scan_casia_thousand(self.raw_dir)
+        meta_df = validate_images(
+            scanned_df, self.raw_dir, check_pixel_stats=True, specular_threshold=245
+        )
+        closed_df = create_closed_set_splits(
+            meta_df,
+            train_per_eye=6,
+            val_per_eye=2,
+            test_per_eye=2,
+            subset_num_subjects=5,
+            seed=42,
+        )
+        open_df = create_open_set_splits(
+            meta_df, train_subjects=14, val_subjects=3, test_subjects=3, seed=42
+        )
+        val_pairs = generate_verification_pairs(
+            open_df[open_df["split"] == "val"],
+            num_genuine=40,
+            num_impostor=40,
+            same_subject_impostor_ratio=0.25,
+            seed=43,
+        )
+        test_pairs = generate_verification_pairs(
+            open_df[open_df["split"] == "test"],
+            num_genuine=40,
+            num_impostor=40,
+            same_subject_impostor_ratio=0.25,
+            seed=44,
+        )
+        leakage_report = verify_no_leakage(closed_df, open_df, val_pairs, test_pairs)
+
+        meta_df.to_csv(out_dir / "metadata.csv", index=False)
+        closed_df.to_csv(out_dir / "closed_set_splits.csv", index=False)
+        open_df.to_csv(out_dir / "open_set_splits.csv", index=False)
+        val_pairs.to_csv(out_dir / "val_pairs.csv", index=False)
+        test_pairs.to_csv(out_dir / "test_pairs.csv", index=False)
+
+        summary = build_dataset_summary(
+            meta_df, closed_df, open_df, val_pairs, test_pairs, leakage_report, cfg
+        )
+        with open(out_dir / "dataset_summary.json", "w", encoding="utf-8") as f:
+            json.dump(summary, f, indent=2, ensure_ascii=False)
 
         expected_files = [
             "metadata.csv",
@@ -291,9 +294,9 @@ class TestDatasetUtils(unittest.TestCase):
             self.assertTrue((out_dir / fname).is_file(), f"Missing output file: {fname}")
 
         with open(out_dir / "dataset_summary.json", "r", encoding="utf-8") as f:
-            summary = json.load(f)
-        self.assertEqual(summary["valid_images"], 400)
-        self.assertTrue(summary["leakage_check"]["passed"])
+            loaded_summary = json.load(f)
+        self.assertEqual(loaded_summary["valid_images"], 400)
+        self.assertTrue(loaded_summary["leakage_check"]["passed"])
         for key in (
             "resolution_distribution",
             "quality_stats",
@@ -301,7 +304,7 @@ class TestDatasetUtils(unittest.TestCase):
             "open_set",
             "verification_pairs",
         ):
-            self.assertIn(key, summary)
+            self.assertIn(key, loaded_summary)
 
 
 if __name__ == "__main__":
